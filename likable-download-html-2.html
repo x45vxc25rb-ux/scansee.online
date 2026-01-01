@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ScanSeeDeside</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="app"></div>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        
+        const EMOJI = {
+          appearance: ['👨', '👩', '🧑', '👴', '👵', '👶', '🧔', '👱', '👨‍🦰', '👩‍🦰'],
+          activity: ['☕', '📚', '💻', '🎧', '🎨', '🍕', '🎮', '✍️', '🎬', '📷'],
+          location: ['🪟', '🚪', '🌳', '🏠', '🛋️', '🪑', '📍', '🗺️', '🧭', '💡'],
+          mood: ['😊', '🤗', '😎', '🤓', '🙂', '😌', '🤝', '👋', '✨', '💭']
+        };
+        
+        const Logo = ({ size = 'normal' }) => {
+            const dimensions = size === 'large' ? 'w-40 h-40' : 'w-24 h-24';
+            return (
+                <div className="relative inline-block">
+                    <svg className={dimensions} viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M 30 170 Q 100 200 170 170" fill="none" stroke="#10b981" strokeWidth="16" strokeLinecap="round"/>
+                        <g transform="translate(100, 80)">
+                            <ellipse cx="0" cy="0" rx="35" ry="40" fill="url(#handGradient)" opacity="0.95"/>
+                            <rect x="-25" y="-45" width="12" height="50" rx="6" fill="url(#handGradient)" opacity="0.95"/>
+                            <rect x="-8" y="-55" width="12" height="60" rx="6" fill="url(#handGradient)" opacity="0.95"/>
+                            <rect x="9" y="-50" width="12" height="55" rx="6" fill="url(#handGradient)" opacity="0.95"/>
+                            <rect x="26" y="-40" width="10" height="45" rx="5" fill="url(#handGradient)" opacity="0.95"/>
+                        </g>
+                        <defs>
+                            <linearGradient id="handGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                                <stop offset="0%" stopColor="#fbbf24" />
+                                <stop offset="100%" stopColor="#f59e0b" stopOpacity="0.7" />
+                            </linearGradient>
+                        </defs>
+                    </svg>
+                    {size === 'large' && (
+                        <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                            <div className="bg-gradient-to-r from-green-400 to-emerald-500 text-transparent bg-clip-text font-bold text-sm tracking-wide">
+                                Scan See Deside
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+        
+        function App() {
+            const [screen, setScreen] = useState('welcome');
+            const [mode, setMode] = useState(null);
+            const [profileType, setProfileType] = useState('emoji');
+            const [userId] = useState('user_' + Date.now());
+            const [ambassadors, setAmbassadors] = useState([]);
+            const [myEmojis, setMyEmojis] = useState([]);
+            const [mySocials, setMySocials] = useState({ facebook: '', instagram: '', tiktok: '' });
+            const [category, setCategory] = useState('appearance');
+            const [requests, setRequests] = useState([]);
+            const [selected, setSelected] = useState(null);
+            
+            useEffect(() => {
+                const interval = setInterval(() => {
+                    if (mode === 'applicant') {
+                        const data = localStorage.getItem('ambassadors');
+                        if (data) {
+                            const list = JSON.parse(data);
+                            setAmbassadors(Object.values(list).filter(a => a.id !== userId));
+                        }
+                    }
+                    if (mode === 'ambassador') {
+                        const data = localStorage.getItem('requests_' + userId);
+                        if (data) setRequests(JSON.parse(data));
+                    }
+                    const accept = localStorage.getItem('accept_' + userId);
+                    if (accept && screen === 'pending') {
+                        setSelected(JSON.parse(accept));
+                        setScreen('connected');
+                        localStorage.removeItem('accept_' + userId);
+                    }
+                }, 500);
+                return () => clearInterval(interval);
+            }, [mode, screen, userId]);
+            
+            const becomeAmbassador = () => {
+                setMode('ambassador');
+                setScreen('chooseType');
+            };
+            
+            const becomeApplicant = () => {
+                setMode('applicant');
+                setScreen('radar');
+                const data = localStorage.getItem('ambassadors');
+                if (data) {
+                    const list = JSON.parse(data);
+                    setAmbassadors(Object.values(list).filter(a => a.id !== userId));
+                }
+            };
+            
+            const confirmProfile = () => {
+                if (profileType === 'emoji' && myEmojis.length >= 3) {
+                    const all = JSON.parse(localStorage.getItem('ambassadors') || '{}');
+                    all[userId] = { id: userId, type: 'emoji', emojis: myEmojis };
+                    localStorage.setItem('ambassadors', JSON.stringify(all));
+                    setScreen('passive');
+                } else if (profileType === 'social' && (mySocials.facebook || mySocials.instagram || mySocials.tiktok)) {
+                    const all = JSON.parse(localStorage.getItem('ambassadors') || '{}');
+                    all[userId] = { id: userId, type: 'social', socials: mySocials };
+                    localStorage.setItem('ambassadors', JSON.stringify(all));
+                    setScreen('passive');
+                }
+            };
+            
+            const sendRequest = (amb) => {
+                const reqs = JSON.parse(localStorage.getItem('requests_' + amb.id) || '[]');
+                reqs.push({ from: userId, timestamp: Date.now() });
+                localStorage.setItem('requests_' + amb.id, JSON.stringify(reqs));
+                setSelected(amb);
+                setScreen('pending');
+            };
+            
+            const acceptRequest = (req) => {
+                const profile = profileType === 'emoji' 
+                    ? { type: 'emoji', emojis: myEmojis }
+                    : { type: 'social', socials: mySocials };
+                localStorage.setItem('accept_' + req.from, JSON.stringify(profile));
+                setRequests(requests.filter(r => r.from !== req.from));
+                localStorage.setItem('requests_' + userId, JSON.stringify(requests.filter(r => r.from !== req.from)));
+                setSelected(profile);
+                setScreen('connected');
+            };
+            
+            if (screen === 'welcome') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-orange-100 via-green-50 to-orange-50 flex items-center justify-center p-4">
+                        <div className="max-w-md w-full bg-white/90 rounded-3xl shadow-2xl p-8 text-center">
+                            <div className="mb-6">
+                                <Logo size="large" />
+                            </div>
+                            <h1 className="text-4xl font-bold mb-3 bg-gradient-to-r from-orange-500 to-green-500 text-transparent bg-clip-text">
+                                ScanSeeDeside
+                            </h1>
+                            <p className="text-gray-600 mb-8">Connect in cafes, your way</p>
+                            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6 text-sm text-left">
+                                <p className="font-bold mb-2">📱 How to test:</p>
+                                <ol className="list-decimal list-inside space-y-1 text-xs">
+                                    <li>Open this file in 2 browser tabs</li>
+                                    <li>Tab 1: Be Ambassador (emojis OR socials)</li>
+                                    <li>Tab 2: Be Applicant</li>
+                                    <li>Watch them connect!</li>
+                                </ol>
+                            </div>
+                            <button onClick={becomeApplicant} className="w-full bg-gradient-to-r from-green-500 to-orange-500 text-white font-bold py-4 rounded-xl mb-3 hover:shadow-lg transition-all">
+                                I'm an Applicant 🔍
+                            </button>
+                            <button onClick={becomeAmbassador} className="w-full bg-gradient-to-r from-purple-500 to-blue-500 text-white font-bold py-4 rounded-xl hover:shadow-lg transition-all">
+                                I'm an Ambassador 👋
+                            </button>
+                            <p className="text-xs text-gray-400 mt-4">Session ID: {userId.toString().slice(-8)}</p>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (screen === 'chooseType') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-100 to-blue-50 flex items-center justify-center p-4">
+                        <div className="max-w-md w-full bg-white/90 rounded-3xl p-8">
+                            <Logo />
+                            <h2 className="text-2xl font-bold mt-4 mb-2">Choose Your Profile Type</h2>
+                            <p className="text-gray-600 mb-6">How do you want to be found?</p>
+                            
+                            <div className="space-y-4 mb-6">
+                                <button 
+                                    onClick={() => { setProfileType('emoji'); setScreen('setupEmoji'); }}
+                                    className="w-full bg-gradient-to-r from-orange-400 to-yellow-400 text-white p-6 rounded-2xl hover:shadow-lg transition-all text-left">
+                                    <div className="text-4xl mb-2">😊☕💻</div>
+                                    <p className="font-bold text-lg">Emoji Profile</p>
+                                    <p className="text-sm text-white/90">Share your vibe with emojis</p>
+                                </button>
+                                
+                                <button 
+                                    onClick={() => { setProfileType('social'); setScreen('setupSocial'); }}
+                                    className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white p-6 rounded-2xl hover:shadow-lg transition-all text-left">
+                                    <div className="flex gap-3 mb-2">
+                                        <span className="text-2xl">📱</span>
+                                        <span className="text-2xl">🔗</span>
+                                        <span className="text-2xl">💬</span>
+                                    </div>
+                                    <p className="font-bold text-lg">Social Media</p>
+                                    <p className="text-sm text-white/90">Share Instagram, TikTok, or Facebook</p>
+                                </button>
+                            </div>
+                            
+                            <button onClick={() => setScreen('welcome')} className="w-full bg-gray-200 py-3 rounded-xl">Back</button>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (screen === 'setupSocial') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-blue-100 to-purple-50 p-4">
+                        <div className="max-w-md mx-auto bg-white/90 rounded-3xl p-8">
+                            <h2 className="text-2xl font-bold mb-2">Add Your Socials</h2>
+                            <p className="text-gray-600 mb-6">Add at least one profile</p>
+                            
+                            <div className="space-y-4 mb-6">
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium mb-2 text-gray-700">
+                                        <span className="text-xl">📘</span> Facebook
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="facebook.com/yourname or @username"
+                                        value={mySocials.facebook}
+                                        onChange={(e) => setMySocials({...mySocials, facebook: e.target.value})}
+                                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 outline-none"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium mb-2 text-gray-700">
+                                        <span className="text-xl">📸</span> Instagram
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="@username"
+                                        value={mySocials.instagram}
+                                        onChange={(e) => setMySocials({...mySocials, instagram: e.target.value})}
+                                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-pink-500 outline-none"
+                                    />
+                                </div>
+                                
+                                <div>
+                                    <label className="flex items-center gap-2 text-sm font-medium mb-2 text-gray-700">
+                                        <span className="text-xl">🎵</span> TikTok
+                                    </label>
+                                    <input 
+                                        type="text" 
+                                        placeholder="@username"
+                                        value={mySocials.tiktok}
+                                        onChange={(e) => setMySocials({...mySocials, tiktok: e.target.value})}
+                                        className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-purple-500 outline-none"
+                                    />
+                                </div>
+                            </div>
+                            
+                            <button 
+                                onClick={confirmProfile}
+                                disabled={!mySocials.facebook && !mySocials.instagram && !mySocials.tiktok}
+                                className={'w-full py-4 rounded-xl font-bold mb-3 transition-all ' + 
+                                    (mySocials.facebook || mySocials.instagram || mySocials.tiktok
+                                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:shadow-lg' 
+                                        : 'bg-gray-200 text-gray-400')}>
+                                Become Ambassador
+                            </button>
+                            
+                            <button onClick={() => setScreen('chooseType')} className="w-full bg-gray-200 py-3 rounded-xl">Back</button>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (screen === 'setupEmoji') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-purple-100 to-blue-50 p-4">
+                        <div className="max-w-md mx-auto bg-white/90 rounded-3xl p-8">
+                            <h2 className="text-2xl font-bold mb-2">Choose Your Emojis</h2>
+                            <p className="text-gray-600 mb-6">Select 3-5 emojis</p>
+                            <div className="bg-purple-50 rounded-2xl p-6 mb-6 min-h-[100px] flex flex-wrap gap-3 items-center justify-center">
+                                {myEmojis.length === 0 ? (
+                                    <p className="text-gray-400 text-sm">Select emojis below</p>
+                                ) : (
+                                    myEmojis.map((e, i) => (
+                                        <button key={i} onClick={() => setMyEmojis(myEmojis.filter(x => x !== e))} 
+                                            className="text-4xl bg-white rounded-xl p-2 shadow hover:scale-110 transition-all">
+                                            {e}
+                                        </button>
+                                    ))
+                                )}
+                            </div>
+                            <p className="text-center text-sm mb-4">{myEmojis.length}/5 • Need 3+</p>
+                            <div className="flex gap-2 mb-4 overflow-x-auto">
+                                {Object.keys(EMOJI).map(cat => (
+                                    <button key={cat} onClick={() => setCategory(cat)} 
+                                        className={'px-4 py-2 rounded-lg text-sm whitespace-nowrap transition-all ' + 
+                                            (category === cat ? 'bg-purple-500 text-white' : 'bg-gray-100')}>
+                                        {cat}
+                                    </button>
+                                ))}
+                            </div>
+                            <div className="grid grid-cols-5 gap-3 mb-6 max-h-[250px] overflow-y-auto p-2">
+                                {EMOJI[category].map((e, i) => (
+                                    <button key={i} 
+                                        onClick={() => myEmojis.length < 5 && !myEmojis.includes(e) && setMyEmojis([...myEmojis, e])} 
+                                        className={'text-3xl p-3 rounded-xl transition-all ' + 
+                                            (myEmojis.includes(e) ? 'bg-purple-100 opacity-50' : 'bg-gray-50 hover:bg-purple-50 hover:scale-110')}>
+                                        {e}
+                                    </button>
+                                ))}
+                            </div>
+                            <button onClick={confirmProfile} disabled={myEmojis.length < 3} 
+                                className={'w-full py-4 rounded-xl font-bold mb-3 transition-all ' + 
+                                    (myEmojis.length >= 3 
+                                        ? 'bg-gradient-to-r from-purple-500 to-blue-500 text-white hover:shadow-lg' 
+                                        : 'bg-gray-200 text-gray-400')}>
+                                Become Ambassador
+                            </button>
+                            <button onClick={() => setScreen('chooseType')} className="w-full bg-gray-200 py-3 rounded-xl">Back</button>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (screen === 'radar') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-orange-100 to-green-50 p-4">
+                        <div className="max-w-md mx-auto">
+                            <div className="bg-white/90 rounded-3xl p-6 mb-4">
+                                <div className="flex items-center gap-3 mb-4">
+                                    <Logo />
+                                    <div>
+                                        <h2 className="text-xl font-bold">Ambassadors Nearby</h2>
+                                        <p className="text-sm text-gray-600">{ambassadors.length} found</p>
+                                    </div>
+                                </div>
+                            </div>
+                            {ambassadors.length > 0 ? (
+                                <div className="space-y-3">
+                                    {ambassadors.map(amb => (
+                                        <button key={amb.id} onClick={() => sendRequest(amb)} 
+                                            className="w-full bg-white/90 rounded-2xl p-4 flex items-center gap-4 hover:shadow-lg transition-all hover:scale-105">
+                                            <div className="w-14 h-14 bg-gradient-to-br from-green-400 to-orange-400 rounded-full flex items-center justify-center text-2xl">
+                                                {amb.type === 'emoji' ? amb.emojis[0] : '📱'}
+                                            </div>
+                                            <div className="flex-1 text-left">
+                                                {amb.type === 'emoji' ? (
+                                                    <>
+                                                        <p className="font-bold">{amb.emojis.join(' ')}</p>
+                                                        <p className="text-sm text-gray-600">Emoji Profile</p>
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <p className="font-bold">Social Profile</p>
+                                                        <p className="text-sm text-gray-600">
+                                                            {amb.socials.instagram && '📸 '}
+                                                            {amb.socials.tiktok && '🎵 '}
+                                                            {amb.socials.facebook && '📘'}
+                                                        </p>
+                                                    </>
+                                                )}
+                                            </div>
+                                            <div className="text-2xl">✋</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-white/90 rounded-2xl p-8 text-center">
+                                    <div className="text-6xl mb-4 animate-pulse">👀</div>
+                                    <p className="text-gray-600 font-semibold">No ambassadors yet...</p>
+                                    <p className="text-sm text-gray-500 mt-2">Open another tab and become one!</p>
+                                </div>
+                            )}
+                            <button onClick={() => setScreen('welcome')} className="w-full mt-4 bg-gray-200 py-3 rounded-xl hover:bg-gray-300 transition-all">Back</button>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (screen === 'passive') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-green-100 to-teal-50 p-4">
+                        <div className="max-w-md mx-auto">
+                            <div className="bg-white/90 rounded-3xl p-6 mb-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <Logo />
+                                        <h2 className="text-xl font-bold">Ambassador Mode</h2>
+                                    </div>
+                                    <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm flex items-center gap-2">
+                                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+                                        Active
+                                    </div>
+                                </div>
+                                <div className="bg-green-50 rounded-2xl p-6">
+                                    <p className="text-sm text-gray-600 mb-2">Your Profile:</p>
+                                    {profileType === 'emoji' ? (
+                                        <p className="text-3xl">{myEmojis.join(' ')}</p>
+                                    ) : (
+                                        <div className="space-y-2 text-sm">
+                                            {mySocials.facebook && <p className="font-medium">📘 {mySocials.facebook}</p>}
+                                            {mySocials.instagram && <p className="font-medium">📸 {mySocials.instagram}</p>}
+                                            {mySocials.tiktok && <p className="font-medium">🎵 {mySocials.tiktok}</p>}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            {requests.length > 0 ? (
+                                <div className="space-y-3">
+                                    <h3 className="text-lg font-bold px-2">🔔 New Requests ({requests.length})</h3>
+                                    {requests.map((req, i) => (
+                                        <div key={i} className="bg-white/90 rounded-2xl p-4 flex items-center gap-4 animate-in">
+                                            <div className="w-14 h-14 bg-gradient-to-br from-green-400 to-teal-400 rounded-full flex items-center justify-center text-2xl animate-bounce">
+                                                👋
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="font-bold">Someone wants to meet!</p>
+                                                <p className="text-sm text-gray-600">Waiting for your response</p>
+                                            </div>
+                                            <button onClick={() => acceptRequest(req)} 
+                                                className="px-5 py-2 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-xl font-bold hover:shadow-lg transition-all hover:scale-105">
+                                                Accept
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="bg-white/90 rounded-2xl p-8 text-center">
+                                    <div className="text-6xl mb-4 animate-pulse">📡</div>
+                                    <p className="text-gray-600">Waiting for applicants...</p>
+                                    <p className="text-sm text-gray-500 mt-2">Open another tab to test!</p>
+                                </div>
+                            )}
+                            <button onClick={() => {
+                                const all = JSON.parse(localStorage.getItem('ambassadors') || '{}');
+                                delete all[userId];
+                                localStorage.setItem('ambassadors', JSON.stringify(all));
+                                setScreen('welcome');
+                            }} className="w-full mt-4 bg-gray-200 py-3 rounded-xl hover:bg-gray-300 transition-all">Leave</button>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (screen === 'pending') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-orange-100 to-green-50 flex items-center justify-center p-4">
+                        <div className="max-w-md w-full bg-white/90 rounded-3xl p-8 text-center">
+                            <div className="text-6xl mb-6 animate-pulse">⏳</div>
+                            <h2 className="text-2xl font-bold mb-4">Requesting...</h2>
+                            <p className="text-gray-600 mb-6">Waiting for them to accept</p>
+                            <div className="bg-gray-50 rounded-xl p-6">
+                                {selected.type === 'emoji' ? (
+                                    <p className="text-4xl mb-3">{selected.emojis.join(' ')}</p>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {selected.socials.facebook && <p className="font-medium">📘 {selected.socials.facebook}</p>}
+                                        {selected.socials.instagram && <p className="font-medium">📸 {selected.socials.instagram}</p>}
+                                        {selected.socials.tiktok && <p className="font-medium">🎵 {selected.socials.tiktok}</p>}
+                                    </div>
+                                )}
+                            </div>
+                            <p className="text-sm text-gray-500 mt-6">💡 Switch to the Ambassador tab and click Accept!</p>
+                        </div>
+                    </div>
+                );
+            }
+            
+            if (screen === 'connected') {
+                return (
+                    <div className="min-h-screen bg-gradient-to-br from-orange-100 to-green-50 flex items-center justify-center p-4">
+                        <div className="max-w-md w-full bg-white/90 rounded-3xl p-8 text-center">
+                            <div className="mb-6">
+                                <Logo size="large" />
+                            </div>
+                            <h2 className="text-3xl font-bold mb-4">Connection Made! 🎉</h2>
+                            <p className="text-gray-600 mb-8">Time to meet up!</p>
+                            <div className="bg-gradient-to-r from-green-50 to-orange-50 rounded-2xl p-6 mb-6">
+                                {selected.type === 'emoji' ? (
+                                    <>
+                                        <p className="text-5xl mb-3">{selected.emojis.join(' ')}</p>
+                                        <p className="text-gray-600">Look for these emojis!</p>
+                                    </>
+                                ) : (
+                                    <>
+                                        <p className="text-gray-600 mb-4 font-semibold">Connect with them:</p>
+                                        <div className="space-y-3">
+                                            {selected.socials.facebook && (
+                                                <a href={`https://facebook.com/${selected.socials.facebook.replace('@', '').replace('facebook.com/', '')}`} 
+                                                   target="_blank" rel="noopener noreferrer"
+                                                   className="block bg-blue-500 text-white px-4 py-3 rounded-xl font-medium hover:shadow-lg transition-all hover:scale-105">
+                                                    📘 Facebook: {selected.socials.facebook}
+                                                </a>
+                                            )}
+                                            {selected.socials.instagram && (
+                                                <a href={`https://instagram.com/${selected.socials.instagram.replace('@', '')}`} 
+                                                   target="_blank" rel="noopener noreferrer"
+                                                   className="block bg-gradient-to-r from-pink-500 to-purple-500 text-white px-4 py-3 rounded-xl font-medium hover:shadow-lg transition-all hover:scale-105">
+                                                    📸 Instagram: {selected.socials.instagram}
+                                                </a>
+                                            )}
+                                            {selected.socials.tiktok && (
+                                                <a href={`https://tiktok.com/@${selected.socials.tiktok.replace('@', '')}`} 
+                                                   target="_blank" rel="noopener noreferrer"
+                                                   className="block bg-black text-white px-4 py-3 rounded-xl font-medium hover:shadow-lg transition-all hover:scale-105">
+                                                    🎵 TikTok: {selected.socials.tiktok}
+                                                </a>
+                                            )}
+                                        </div>
+                                    </>
+                                )}
+                            </div>
+                            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6">
+                                <p className="text-sm text-blue-800">💬 Say "Hi, I saw your hand!" to break the ice!</p>
+                            </div>
+                            <button onClick={() => setScreen('welcome')} 
+                                className="w-full bg-gradient-to-r from-green-500 to-orange-500 text-white font-bold py-4 rounded-xl hover:shadow-lg transition-all hover:scale-105">
+                                Done! ✨
+                            </button>
+                        </div>
+                    </div>
+                );
+            }
+        }
+        
+        ReactDOM.render(<App />, document.getElementById('app'));
+    </script>
+</body>
+</html>
